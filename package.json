@@ -1,0 +1,43 @@
+{
+  "name": "mini-bank-api",
+  "version": "0.0.1",
+  "description": "Mini Banque api est le backend de construit specialement pour mini--banque",
+  "keywords": [
+    "neylorxt",
+    "mini-bank",
+    "bank"
+  ],
+  "homepage": "https://github.com/neylorxt/mini-banque-api#readme",
+  "bugs": {
+    "url": "https://github.com/neylorxt/mini-banque-api/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neylorxt/mini-banque-api.git"
+  },
+  "license": "MIT",
+  "author": "neylorxt",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "prisma generate && nodemon server.js",
+    "start": "node server.js",
+    "build": "prisma generate && prisma db push",
+    "generate": "prisma generate",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.11.1",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10",
+    "prisma": "^6.11.1"
+  }
+}
