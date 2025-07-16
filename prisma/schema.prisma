@@ -17,30 +17,35 @@ datasource db {
 model User {
   id        Int      @id @default(autoincrement())
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
   username  String   @unique
   email     String   @unique
   password  String
   money     Int?     @default(500)
 
-  recentFundsTransfer RecentFundsTransfer[]
-  recentFundsReceive  RecentFundsReceive[]
+  sentTransfers     RecentFundsTransfer[] @relation("SentTransfers")
+  receivedTransfers RecentFundsTransfer[] @relation("ReceivedTransfers")
+  fundsReceiveLogs  RecentFundsReceive[]
 }
 
 model RecentFundsTransfer {
-  id                  Int      @id @default(autoincrement())
-  amount              Int
-  createdAt           DateTime @default(now())
-  user                User     @relation(fields: [userId], references: [id])
-  userId              Int
-  userFundsTransferId Int
+  id        Int      @id @default(autoincrement())
+  amount    Int
+  message   String?
+  createdAt DateTime @default(now())
+
+  sender   User @relation("SentTransfers", fields: [senderId], references: [id])
+  senderId Int
+
+  receiver   User @relation("ReceivedTransfers", fields: [receiverId], references: [id])
+  receiverId Int
 }
 
 model RecentFundsReceive {
-  id                 Int      @id @default(autoincrement())
-  createdAt          DateTime @default(now())
-  amount             Int
-  user               User     @relation(fields: [userId], references: [id])
-  userId             Int
-  userFundsReceiveId Int
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  amount    Int
+
+  user   User @relation(fields: [userId], references: [id])
+  userId Int
 }
