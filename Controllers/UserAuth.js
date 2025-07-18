@@ -1,4 +1,6 @@
 import prisma from '../Config/Prisma.js'
+import {sentTransferDTO, receiveTransferDTO} from "../utils/return/sentTransferDTO.js";
+
 
 export const getMyData = async (req, res) => {
     const {id} = req.user;
@@ -12,13 +14,32 @@ export const getMyData = async (req, res) => {
                 id
             },
             include: {
-                sentTransfers: true,
-                receivedTransfers: true,
-                fundsReceiveLogs: true,
+                sentTransfers: {
+                    orderBy: {
+                        id: 'desc'
+                    }
+                },
+                receivedTransfers: {
+                    orderBy: {
+                        id: 'desc'
+                    }
+                }
             }
         })
 
         const {password, ...newUser} = user;
+
+        //Attendre toutes les DTOs en parallele
+        newUser.sentTransfers = await Promise.all(
+            newUser.sentTransfers.map( (transfer) => sentTransferDTO( {transfer} ))
+        )
+
+        //Attendre toutes les DTOs en parallele
+        newUser.receivedTransfers = await Promise.all(
+            newUser.receivedTransfers.map( (receive) => receiveTransferDTO( {receive} ))
+        )
+
+
 
         res.status(200).json({user: newUser})
 
@@ -58,6 +79,26 @@ export const deleteMyData = async (req, res) => {
 }
 
 
+export const getUserById = async (id) => {
+
+    try {
+        const user = await prisma.user.findFirst({
+            where: {
+                id
+            }
+        })
+
+        if (!user) return null;
+
+        const {password, ...newUser} = user;
+
+        return newUser;
+
+    }catch (err) {
+        console.error("Erreur détaillée:", err);
+    }
+}
+
 
 export const transfer = async (req, res) => {
     const {id} = req.user;
@@ -69,7 +110,6 @@ export const transfer = async (req, res) => {
 
     const {username, amount, message} = req.body;
 
-    console.log(username, amount, message)
 
     try {
         // Vérifier si l'utilisateur existe
@@ -100,6 +140,7 @@ export const transfer = async (req, res) => {
 
         // Exécuter la transaction
         await prisma.$transaction(async (tx) => {
+
             // Décrémenter l'argent de l'expéditeur
             await tx.user.update({
                 where: {
@@ -107,7 +148,7 @@ export const transfer = async (req, res) => {
                 },
                 data: {
                     money: {
-                        decrement: amount
+                        decrement: Number(amount)
                     }
                 }
             });
@@ -119,7 +160,7 @@ export const transfer = async (req, res) => {
                 },
                 data: {
                     money: {
-                        increment: amount
+                        increment: Number(amount)
                     }
                 }
             });
@@ -127,7 +168,7 @@ export const transfer = async (req, res) => {
             // Créer l'enregistrement du transfert
             await tx.recentFundsTransfer.create({
                 data: {
-                    amount,
+                    amount: Number(amount),
                     senderId: id,
                     receiverId: receiver.id,
                     message: message ? message : "Aucun message",
@@ -142,8 +183,7 @@ export const transfer = async (req, res) => {
             },
             include: {
                 sentTransfers: true,
-                receivedTransfers: true,
-                fundsReceiveLogs: true,
+                receivedTransfers: true
             }
         })
 
@@ -153,9 +193,93 @@ export const transfer = async (req, res) => {
 
         const {password, ...newUser} = userFound;
 
+        //Attendre toutes les DTOs en parallele
+        newUser.sentTransfers = await Promise.all(
+            newUser.sentTransfers.map( (transfer) => sentTransferDTO( {transfer} ))
+        )
+
+        //Attendre toutes les DTOs en parallele
+        newUser.receivedTransfers = await Promise.all(
+            newUser.receivedTransfers.map( (receive) => receiveTransferDTO( {receive} ))
+        )
+
         res.status(200).json({
             user: newUser,
             message: "Transfer successfully."
+        })
+
+    } catch (err) {
+        console.error("Erreur détaillée:", err);
+
+        // Gestion d'erreurs plus spécifique
+        if (err.code === 'P2002') {
+            return res.status(400).json({error: "Erreur de contrainte de base de données"});
+        }
+
+        if (err.code === 'P2025') {
+            return res.status(400).json({error: "Enregistrement non trouvé"});
+        }
+
+        if (err.message.includes('Insufficient funds')) {
+            return res.status(400).json({error: "Fonds insuffisants"});
+        }
+
+        // Erreur générale mais plus informative
+        res.status(500).json({
+            error: "Erreur lors du transfert",
+            details: process.env.NODE_ENV === 'development' ? err.message : undefined
+        });
+    }
+}
+
+
+
+export const addMoney = async (req, res) => {
+    const {id} = req.user;
+
+    if(isNaN(id)) return res.status(400).json({error: "ID invalide"});
+    if(!req.body) return res.status(400).json({error: "Donnees manquantes"});
+    if(!req.body.amount) return res.status(400).json({error: "Montant manquant"});
+    if(isNaN(req.body.amount) ) return res.status(400).json({error: "Montant invalide"});
+
+    const {amount} = req.body;
+
+
+    try {
+        // Vérifier si l'utilisateur existe
+        const user = await prisma.user.findFirst({
+            where: {
+                id
+            }
+        })
+
+        if (!user) return res.status(400).json({error: "User not found"});
+
+        const userAddMoney = await prisma.user.update({
+            where: {
+                id
+            },
+            data: {
+                money: {
+                    increment: Number(amount)
+                }
+            },
+            include: {
+                sentTransfers: true,
+                receivedTransfers: true,
+            }
+        })
+
+
+        if (!userAddMoney) {
+            return res.status(500).json({ error: "User could not be retrieved after transfer." });
+        }
+
+        const {password, ...newUser} = userAddMoney;
+
+        res.status(200).json({
+            user: newUser,
+            message: "Add Successfully."
         })
 
     } catch (err) {
